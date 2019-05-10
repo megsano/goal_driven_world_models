@@ -2,7 +2,7 @@
 Code for CS 231N Project by Kent Vainio, Sharman Tan, and Megumi Sano
 
 ## TODO's 
--[ ] Milestone 
+- [ ] Milestone 
   - [ ] Implement simple baseline 
   - [ ] Train V and M together 
   - [ ] Train with attention 
