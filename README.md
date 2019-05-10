@@ -6,3 +6,4 @@ Code for CS 231N Project by Kent Vainio, Sharman Tan, and Megumi Sano
   - [ ] Implement simple baseline 
   - [ ] Train V and M together 
   - [ ] Train with attention 
+  - [ ] Try out a different environment? Atari
