@@ -40,7 +40,7 @@ def count_length_of_filelist(filelist):
       print("loading file", i)
   return  total_length
 
-def create_dataset(filelist, N=200, M=1000): # N is 10000 episodes, M is number of timesteps
+def create_dataset(filelist, N=160, M=1000): # N is 10000 episodes, M is number of timesteps # 160 for training 
   data = np.zeros((M*N, 64, 64, 3), dtype=np.uint8)
   idx = 0
   for i in range(N):
@@ -60,8 +60,8 @@ def create_dataset(filelist, N=200, M=1000): # N is 10000 episodes, M is number 
 # load dataset from record/*. only use first 10K, sorted by filename.
 filelist = os.listdir(DATA_DIR)
 filelist.sort()
-filelist = filelist[0:160]
-#print("check total number of images:", count_length_of_filelist(filelist))
+filelist = filelist[0:160] # just on training split 
+print("check total number of images:", count_length_of_filelist(filelist))
 dataset = create_dataset(filelist)
 
 # train_datagen = ImageDataGenerator(
@@ -95,6 +95,7 @@ vae = ConvVAE(z_size=z_size,
 # train loop:
 print("train", "step", "loss", "recon_loss", "kl_loss")
 for epoch in range(NUM_EPOCH):
+  print("epoch : {}".format(epoch))
   np.random.shuffle(dataset)
   for idx in range(num_batches):
     batch = dataset[idx*batch_size:(idx+1)*batch_size]
