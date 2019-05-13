@@ -11,7 +11,12 @@ import random
 import numpy as np
 np.set_printoptions(precision=4, edgeitems=6, linewidth=100, suppress=True)
 
-from vae.vae import ConvVAE, reset_graph
+MODEL = 'resnet50'
+
+if MODEL == 'vae':
+  from vae.vae import ConvVAE, reset_graph 
+elif MODEL == 'resnet50':
+  from vae.vae_resnet import ConvVAE, reset_graph # changed to vae_resnet 
 
 # Hyperparameters for ConvVAE
 z_size=32
@@ -94,8 +99,11 @@ vae = ConvVAE(z_size=z_size,
 
 # train loop:
 print("train", "step", "loss", "recon_loss", "kl_loss")
+
 for epoch in range(NUM_EPOCH):
+
   print("epoch : {}".format(epoch))
+
   np.random.shuffle(dataset)
   for idx in range(num_batches):
     batch = dataset[idx*batch_size:(idx+1)*batch_size]
@@ -103,15 +111,29 @@ for epoch in range(NUM_EPOCH):
     obs = batch.astype(np.float)/255.0
 
     feed = {vae.x: obs,}
+    print("obs.shape: {}".format(obs.shape))
 
-    (train_loss, r_loss, kl_loss, train_step, _) = vae.sess.run([
-      vae.loss, vae.r_loss, vae.kl_loss, vae.global_step, vae.train_op
-    ], feed)
-  
-    if ((train_step+1) % 500 == 0):
-      print("step", (train_step+1), train_loss, r_loss, kl_loss)
-    if ((train_step+1) % 5000 == 0):
-      vae.save_json("tf_vae/vae_new.json")
+    if MODEL == 'vae':
+      (train_loss, r_loss, kl_loss, train_step, _) = vae.sess.run([
+        vae.loss, vae.r_loss, vae.kl_loss, vae.global_step, vae.train_op
+      ], feed)
+      if ((train_step+1) % 500 == 0):
+        print("step", (train_step+1), train_loss, r_loss, kl_loss)
+      if ((train_step+1) % 5000 == 0):
+        vae.save_json("tf_vae/vae_new.json")
+
+    elif MODEL == 'resnet50':
+      (train_loss, r_loss, train_step, _) = vae.sess.run([
+        vae.loss, vae.r_loss, vae.global_step, vae.train_op
+      ], feed)
+      if ((train_step+1) % 500 == 0):
+        print("step", (train_step+1), train_loss, r_loss)
+      if ((train_step+1) % 5000 == 0):
+        vae.save_json("tf_vae/vae_resnet.json")
+    
 
 # finished, final model:
-vae.save_json("tf_vae/vae_new.json")
+if MODEL == 'vae':
+  vae.save_json("tf_vae/vae_new.json")
+elif MODEL == 'resnet50':
+  vae.save_json("tf_vae/vae_resnet.json")
