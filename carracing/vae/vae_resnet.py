@@ -7,6 +7,17 @@ import os
 
 from keras.applications.resnet50 import ResNet50, preprocess_input
 from keras.preprocessing.image import ImageDataGenerator
+from keras.layers import Dense, Activation, Flatten, Reshape, Conv2DTranspose
+from keras.models import Sequential, Model
+from keras import backend as K
+from keras.optimizers import SGD, Adam
+# Conv2DTranspose = tf.keras.layers.Conv2DTranspose
+
+# import tensornets as nets 
+
+# slim = tf.contrib.slim
+# from PIL import Image
+# from inception_resnet_v2 import *
 
 def reset_graph():
   if 'sess' in globals() and sess:
@@ -34,9 +45,35 @@ class ConvVAE(object):
     self.g = tf.Graph()
     with self.g.as_default():
 
-      self.x = tf.placeholder(tf.float32, shape=[None, 64, 64, 3])
+      self.x = tf.placeholder(tf.float32, shape=[100, 64, 64, 3], name='input_data')# changed from  None, 64, 64, 3 
 
       # Encoder
+
+      ### new code ### 
+
+      # logits = nets.ResNet50(self.x, is_training=True, classes=10)
+      # model = tf.identity(logits, name='logits')
+
+      # arg_scope = tf.contrib.slim.nets.inception.inception_v3_arg_scope()
+
+      # with tf.contrib.framework.arg_scope(arg_scope):
+      #   tf_logits, end_points = tf.contrib.slim.nets.inception.inception_v3(
+      #       scaled_inputs,
+      #       num_classes=2*2*256,
+      #       is_training=tf_is_training,
+      #       dropout_keep_prob=0.8)
+
+      # # Lists of scopes of weights to include/exclude from pretrained snapshot
+      # pretrained_include = ["InceptionV3"]
+      # pretrained_exclude = ["InceptionV3/AuxLogits", "InceptionV3/Logits"]
+      # # PRETRAINED SAVER - For loading pretrained weights on the first run
+      # pretrained_vars = tf.contrib.framework.get_variables_to_restore(include=pretrained_include, exclude=pretrained_exclude)
+      # tf_pretrained_saver = tf.train.Saver(pretrained_vars, name="pretrained_saver")
+      # # MAIN SAVER - For saving/restoring your complete model
+      # tf_saver = tf.train.Saver(name="saver")
+      # predictions = vgg.vgg_16(images, is_training=True)
+
+      ### 
 
       ####### new ResNet 50 encoder #######
       HEIGHT = 64 
@@ -44,7 +81,7 @@ class ConvVAE(object):
 
       base_model = ResNet50(weights='imagenet',
                             include_top=False,
-                            input_shape=(HEIGHT, WIDTH, 3))
+                            input_shape=(HEIGHT, WIDTH, 3)) 
 
       # train_datagen = ImageDataGenerator(
       #   preprocessing_function=preprocess_input,
@@ -59,57 +96,99 @@ class ConvVAE(object):
       #                                                     batch_size=self.batch_size
       #                                                     )
 
-      def build_finetune_model(base_model, dropout, fc_layers, num_classes):
-        for layer in base_model.layers:
-            layer.trainable = False
+      # def build_finetune_model(base_model, dropout, fc_layers):
+      #   for layer in base_model.layers:
+      #       layer.trainable = False
 
-        x = base_model.output
-        x = Flatten()(x)
-        for fc in fc_layers:
-            # New FC layer, random init
-            x = Dense(fc, activation='relu')(x) 
-            # x = Dropout(dropout)(x)
+      #   x = base_model.output
+      #   x = Flatten()(x)
+      #   for fc in fc_layers:
+      #       # New FC layer, random init
+      #       x = Dense(fc, activation='relu')(x) 
+      #       # x = Dropout(dropout)(x)
 
-        # New softmax layer
-        predictions = Dense(2*2*256)(x) 
+      #   # New softmax layer
+      #   latent = Dense(2*2*256)(x) 
+
+      #   x = Dense(4*256)(latent)
+      #   x = Reshape((32, 32, 1))(x) 
+
+      #   # x = reshape(h, [-1, 1, 4*256])
+      #   x = Conv2DTranspose(filters=128, kernel_size=(5,5), strides=(2,2), activation='relu')(x)
+      #   x = Conv2DTranspose(filters=64, kernel_size=(5,5), strides=(2,2), activation='relu')(x)
+      #   x = Conv2DTranspose(filters=32, kernel_size=(6,6), strides=(2,2), activation='relu')(x)
+      #   x = Conv2DTranspose(filters=128, kernel_size=(5,5), strides=(2,2), activation='relu')(x)
+      #   y = Conv2DTranspose(filters=3, kernel_size=(6,6), strides=(2,2), activation='sigmoid')(x)
         
-        finetune_model = Model(inputs=base_model.input, outputs=predictions)
+      #   finetune_model = Model(inputs=base_model.input, outputs=y)
 
-        return finetune_model
+      #   return finetune_model
+      base_model.compile(loss='categorical_crossentropy',
+              optimizer='rmsprop',
+              metrics=['accuracy'])
 
       FC_LAYERS = [1024, 1024] # tweak later 
-      dropout = 0.5 
+      fc_layers = [1024, 1024] # tweak later 
+      # dropout = 0.5 
 
-      finetune_model = build_finetune_model(base_model, 
-                                      dropout=dropout, 
-                                      fc_layers=FC_LAYERS, 
-                                      num_classes=len(class_list))
+      # finetune_model = build_finetune_model(base_model, 
+      #                                 dropout=dropout, 
+      #                                 fc_layers=FC_LAYERS)
 
-      
+      for layer in base_model.layers:
+        layer.trainable = False
+
+      x = base_model.output#base_model.output
+      x = Flatten()(x)
+      for fc in fc_layers:
+          # New FC layer, random init
+          x = Dense(fc, activation='relu')(x) 
+          # x = Dropout(dropout)(x)
+
+      # New softmax layer
+      latent = Dense(2*2*256)(x) 
+
+      x = Dense(4*256)(latent)
+      x = Reshape((32, 32, 1))(x) 
+
+      # x = reshape(h, [-1, 1, 4*256])
+      x = Conv2DTranspose(filters=128, kernel_size=(5,5), strides=(2,2), activation='relu')(x)
+      x = Conv2DTranspose(filters=64, kernel_size=(5,5), strides=(2,2), activation='relu')(x)
+      x = Conv2DTranspose(filters=32, kernel_size=(6,6), strides=(2,2), activation='relu')(x)
+      x = Conv2DTranspose(filters=128, kernel_size=(5,5), strides=(2,2), activation='relu')(x)
+      y = Conv2DTranspose(filters=3, kernel_size=(6,6), strides=(2,2), activation='sigmoid')(x)
+        
+      # keras_model_output = K.function([finetune_model.input], [finetune_model.output])
+      finetune_model = Model(inputs=base_model.input, outputs=y)
+      adam = Adam(lr=0.00001)
+      finetune_model.compile(adam, loss='categorical_crossentropy', metrics=['accuracy'])
+      self.y = finetune_model.predict(self.x, steps=1)
+
+      # self.y = y# keras_model_output([self.x])
 
       #######
 
 
-      h = tf.layers.conv2d(self.x, 32, 4, strides=2, activation=tf.nn.relu, name="enc_conv1")
-      h = tf.layers.conv2d(h, 64, 4, strides=2, activation=tf.nn.relu, name="enc_conv2")
-      h = tf.layers.conv2d(h, 128, 4, strides=2, activation=tf.nn.relu, name="enc_conv3")
-      h = tf.layers.conv2d(h, 256, 4, strides=2, activation=tf.nn.relu, name="enc_conv4")
-      h = tf.reshape(h, [-1, 2*2*256])
+      # h = tf.layers.conv2d(self.x, 32, 4, strides=2, activation=tf.nn.relu, name="enc_conv1")
+      # h = tf.layers.conv2d(h, 64, 4, strides=2, activation=tf.nn.relu, name="enc_conv2")
+      # h = tf.layers.conv2d(h, 128, 4, strides=2, activation=tf.nn.relu, name="enc_conv3")
+      # h = tf.layers.conv2d(h, 256, 4, strides=2, activation=tf.nn.relu, name="enc_conv4")
+      # h = tf.reshape(h, [-1, 2*2*256])
 
-      # VAE
-      # self.mu = tf.layers.dense(h, self.z_size, name="enc_fc_mu")
-      # self.logvar = tf.layers.dense(h, self.z_size, name="enc_fc_log_var")
-      # self.sigma = tf.exp(self.logvar / 2.0)
-      # self.epsilon = tf.random_normal([self.batch_size, self.z_size])
-      # self.z = self.mu + self.sigma * self.epsilon
+      # # VAE
+      # # self.mu = tf.layers.dense(h, self.z_size, name="enc_fc_mu")
+      # # self.logvar = tf.layers.dense(h, self.z_size, name="enc_fc_log_var")
+      # # self.sigma = tf.exp(self.logvar / 2.0)
+      # # self.epsilon = tf.random_normal([self.batch_size, self.z_size])
+      # # self.z = self.mu + self.sigma * self.epsilon
 
-      # Decoder
-      h = tf.layers.dense(self.z, 4*256, name="dec_fc")
-      h = tf.reshape(h, [-1, 1, 1, 4*256])
-      h = tf.layers.conv2d_transpose(h, 128, 5, strides=2, activation=tf.nn.relu, name="dec_deconv1")
-      h = tf.layers.conv2d_transpose(h, 64, 5, strides=2, activation=tf.nn.relu, name="dec_deconv2")
-      h = tf.layers.conv2d_transpose(h, 32, 6, strides=2, activation=tf.nn.relu, name="dec_deconv3")
-      self.y = tf.layers.conv2d_transpose(h, 3, 6, strides=2, activation=tf.nn.sigmoid, name="dec_deconv4")
+      # # Decoder
+      # h = tf.layers.dense(self.z, 4*256, name="dec_fc")
+      # h = tf.reshape(h, [-1, 1, 1, 4*256])
+      # h = tf.layers.conv2d_transpose(h, 128, 5, strides=2, activation=tf.nn.relu, name="dec_deconv1")
+      # h = tf.layers.conv2d_transpose(h, 64, 5, strides=2, activation=tf.nn.relu, name="dec_deconv2")
+      # h = tf.layers.conv2d_transpose(h, 32, 6, strides=2, activation=tf.nn.relu, name="dec_deconv3")
+      # self.y = tf.layers.conv2d_transpose(h, 3, 6, strides=2, activation=tf.nn.sigmoid, name="dec_deconv4")
       
       # train ops
       if self.is_training:
