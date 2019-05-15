@@ -1,4 +1,4 @@
-# Attentive Dreams 
+# Enhanced World Models for Goal-Driven Learning
 Code for CS 231N Project by Kent Vainio, Sharman Tan, and Megumi Sano
 
 ## TODO's 
