@@ -12,4 +12,4 @@ Code for CS 231N Project by Kent Vainio, Sharman Tan, and Megumi Sano
 - [ ] Final Report (Tues 6/4) 
 - [ ] Poster Session (Tues 6/11) 
 
-** Most of repo content comes from WorldModelsExperiments **
+** Most of repo content as of now comes from https://github.com/ctallec/world-models **
