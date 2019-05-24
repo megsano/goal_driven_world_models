@@ -160,4 +160,3 @@ class VAERNNCell(_VAERNNBase):
         d = out_full[:, -1]
 
         return mus, sigmas, logpi, r, d, next_hidden, recon_batch, latent, logvar
-
