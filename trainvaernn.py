@@ -81,30 +81,30 @@ test_loader = DataLoader(
     RolloutSequenceDataset('/home/gengar888/world-models/rollouts/', SEQ_LEN, transform, train=False, buffer_size=10),
     batch_size=BSIZE, num_workers=8)
 
-def to_latent(obs, next_obs):
-    """ Transform observations to latent space.
+# def to_latent(obs, next_obs):
+#     """ Transform observations to latent space.
 
-    :args obs: 5D torch tensor (BSIZE, SEQ_LEN, ASIZE, SIZE, SIZE)
-    :args next_obs: 5D torch tensor (BSIZE, SEQ_LEN, ASIZE, SIZE, SIZE)
+#     :args obs: 5D torch tensor (BSIZE, SEQ_LEN, ASIZE, SIZE, SIZE)
+#     :args next_obs: 5D torch tensor (BSIZE, SEQ_LEN, ASIZE, SIZE, SIZE)
 
-    :returns: (latent_obs, latent_next_obs)
-        - latent_obs: 4D torch tensor (BSIZE, SEQ_LEN, LSIZE)
-        - next_latent_obs: 4D torch tensor (BSIZE, SEQ_LEN, LSIZE)
-    """
-    with torch.no_grad():
-        obs, next_obs = [
-            f.upsample(x.view(-1, 3, SIZE, SIZE), size=RED_SIZE,
-                       mode='bilinear', align_corners=True)
-            for x in (obs, next_obs)]
+#     :returns: (latent_obs, latent_next_obs)
+#         - latent_obs: 4D torch tensor (BSIZE, SEQ_LEN, LSIZE)
+#         - next_latent_obs: 4D torch tensor (BSIZE, SEQ_LEN, LSIZE)
+#     """
+#     with torch.no_grad():
+#         obs, next_obs = [
+#             f.upsample(x.view(-1, 3, SIZE, SIZE), size=RED_SIZE,
+#                        mode='bilinear', align_corners=True)
+#             for x in (obs, next_obs)]
 
-        (obs_mu, obs_logsigma), (next_obs_mu, next_obs_logsigma) = [
-            vae(x)[1:] for x in (obs, next_obs)]
+#         (obs_mu, obs_logsigma), (next_obs_mu, next_obs_logsigma) = [
+#             vae(x)[1:] for x in (obs, next_obs)]
 
-        latent_obs, latent_next_obs = [
-            (x_mu + x_logsigma.exp() * torch.randn_like(x_mu)).view(BSIZE, SEQ_LEN, LSIZE)
-            for x_mu, x_logsigma in
-            [(obs_mu, obs_logsigma), (next_obs_mu, next_obs_logsigma)]]
-    return latent_obs, latent_next_obs
+#         latent_obs, latent_next_obs = [
+#             (x_mu + x_logsigma.exp() * torch.randn_like(x_mu)).view(BSIZE, SEQ_LEN, LSIZE)
+#             for x_mu, x_logsigma in
+#             [(obs_mu, obs_logsigma), (next_obs_mu, next_obs_logsigma)]]
+#     return latent_obs, latent_next_obs
 
 def get_loss(latent_obs, action, reward, terminal,
              latent_next_obs, include_reward: bool):
@@ -220,4 +220,3 @@ for e in range(epochs):
     if earlystopping.stop:
         print("End of Training because of early stopping at epoch {}".format(e))
         break
-
