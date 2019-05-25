@@ -50,7 +50,7 @@ def gmm_loss(gt_next_obs, recon_next_obs, sigma_obs, logpi, reduce=True): # pyli
     #     return - torch.mean(log_prob)
     # return - log_prob
 
-    # this is where jank file starts 
+    # this is where jank file starts
 
     gt_next_obs = gt_next_obs.transpose(1,0)
     gt_next_obs = f.upsample(gt_next_obs.view(-1, 3, SIZE, SIZE), size=RED_SIZE, mode='bilinear', align_corners=True)
@@ -159,12 +159,12 @@ class VAERNN(_VAERNNBase):
         vae_obs = self.vae.decoder(mu_vae)
         recon_vae_obs = vae_obs.view(SEQ_LEN, BSIZE, n_gauss, -1)
 
-        n_gauss = sigmas.size(2)
-        sigma_vae = sigmas.contiguous().view(-1, self.latents)
-        vae_sigma = self.vae.decoder(sigma_vae)
-        sigma_obs = vae_sigma.view(SEQ_LEN, BSIZE, n_gauss, -1)
+        # n_gauss = sigmas.size(2)
+        # sigma_vae = sigmas.contiguous().view(-1, self.latents)
+        # vae_sigma = self.vae.decoder(sigma_vae)
+        # sigma_obs = vae_sigma.view(SEQ_LEN, BSIZE, n_gauss, -1)
 
-        return mus, recon_vae_obs, sigma_obs, logpi, rs, ds, recon_batch, latents
+        return mus, recon_vae_obs, sigmas, logpi, rs, ds, recon_batch, latents
 
 # class VAERNNCell(_VAERNNBase):
 #     """ MDRNN model for one step forward """
