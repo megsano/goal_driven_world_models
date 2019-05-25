@@ -38,7 +38,7 @@ epochs = 30
 # Loading VAE
 vae_file = join(args.logdir, 'vae', 'best.tar')
 assert exists(vae_file), "No trained VAE in the logdir..."
-state = torch.load(vae_file)
+state = torch.load(vae_file, map_location='cpu')
 print("Loading VAE at epoch {} "
       "with test error {}".format(
           state['epoch'], state['precision']))
@@ -75,10 +75,10 @@ if exists(rnn_file) and not args.noreload:
 transform = transforms.Lambda(
     lambda x: np.transpose(x, (0, 3, 1, 2)) / 255)
 train_loader = DataLoader(
-    RolloutSequenceDataset('datasets/carracing', SEQ_LEN, transform, buffer_size=30),
+    RolloutSequenceDataset('./rollouts/', SEQ_LEN, transform, buffer_size=30),
     batch_size=BSIZE, num_workers=8, shuffle=True)
 test_loader = DataLoader(
-    RolloutSequenceDataset('datasets/carracing', SEQ_LEN, transform, train=False, buffer_size=10),
+    RolloutSequenceDataset('./rollouts/', SEQ_LEN, transform, train=False, buffer_size=10),
     batch_size=BSIZE, num_workers=8)
 
 def to_latent(obs, next_obs):
@@ -97,6 +97,7 @@ def to_latent(obs, next_obs):
                        mode='bilinear', align_corners=True)
             for x in (obs, next_obs)]
 
+        print(obs[0].size())
         (obs_mu, obs_logsigma), (next_obs_mu, next_obs_logsigma) = [
             vae(x)[1:] for x in (obs, next_obs)]
 
@@ -163,7 +164,7 @@ def data_pass(epoch, train, include_reward): # pylint: disable=too-many-locals
     pbar = tqdm(total=len(loader.dataset), desc="Epoch {}".format(epoch))
     for i, data in enumerate(loader):
         obs, action, reward, terminal, next_obs = [arr.to(device) for arr in data]
-
+        print(obs.size(), next_obs.size())
         # transform obs
         latent_obs, latent_next_obs = to_latent(obs, next_obs)
 

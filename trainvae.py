@@ -55,9 +55,9 @@ transform_test = transforms.Compose([
     transforms.ToTensor(),
 ])
 
-dataset_train = RolloutObservationDataset('/home/gengar888/world-models/rollouts/',
+dataset_train = RolloutObservationDataset('./rollouts/',
                                           transform_train, train=True)
-dataset_test = RolloutObservationDataset('/home/gengar888/world-models/rollouts/',
+dataset_test = RolloutObservationDataset('./rollouts/',
                                          transform_test, train=False)
 train_loader = torch.utils.data.DataLoader(
     dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=2)

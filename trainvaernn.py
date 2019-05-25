@@ -17,7 +17,7 @@ from utils.learning import ReduceLROnPlateau
 
 from data.loaders import RolloutSequenceDataset
 from models.vae import VAE
-from models.vaernn import VAERNN, gmm_loss
+from models.vae_rnn import VAERNN, gmm_loss
 
 parser = argparse.ArgumentParser("VAERNN training")
 parser.add_argument('--logdir', type=str,
@@ -52,10 +52,10 @@ vaernn_file = join(vaernn_dir, 'best.tar')
 
 if not exists(vaernn_dir):
     mkdir(vaernn_dir)
-   
+
 vaernn = VAERNN(LSIZE, ASIZE, RSIZE, 5)
 vaernn.to(device)
-optimizer = torch.optim.RMSprop(mdrnn.parameters(), lr=1e-3, alpha=.9)
+optimizer = torch.optim.RMSprop(vaernn.parameters(), lr=1e-3, alpha=.9)
 scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=5)
 earlystopping = EarlyStopping('min', patience=30)
 
@@ -75,10 +75,10 @@ if exists(vaernn_file) and not args.noreload:
 transform = transforms.Lambda(
     lambda x: np.transpose(x, (0, 3, 1, 2)) / 255)
 train_loader = DataLoader(
-    RolloutSequenceDataset('/home/gengar888/world-models/rollouts/', SEQ_LEN, transform, buffer_size=30),
+    RolloutSequenceDataset('./rollouts/', SEQ_LEN, transform, buffer_size=30),
     batch_size=BSIZE, num_workers=8, shuffle=True)
 test_loader = DataLoader(
-    RolloutSequenceDataset('/home/gengar888/world-models/rollouts/', SEQ_LEN, transform, train=False, buffer_size=10),
+    RolloutSequenceDataset('./rollouts/', SEQ_LEN, transform, train=False, buffer_size=10),
     batch_size=BSIZE, num_workers=8)
 
 # def to_latent(obs, next_obs):
@@ -106,8 +106,8 @@ test_loader = DataLoader(
 #             [(obs_mu, obs_logsigma), (next_obs_mu, next_obs_logsigma)]]
 #     return latent_obs, latent_next_obs
 
-def get_loss(latent_obs, action, reward, terminal,
-             latent_next_obs, include_reward: bool):
+def get_loss(gt_obs, action, reward, terminal,
+             gt_next_obs, include_reward: bool):
     """ Compute losses.
 
     The loss that is computed is:
@@ -125,14 +125,15 @@ def get_loss(latent_obs, action, reward, terminal,
     :returns: dictionary of losses, containing the gmm, the mse, the bce and
         the averaged loss.
     """
-    latent_obs, action,\
+    gt_obs, action,\
         reward, terminal,\
-        latent_next_obs = [arr.transpose(1, 0)
-                           for arr in [latent_obs, action,
+        gt_next_obs = [arr.transpose(1, 0)
+                           for arr in [gt_obs, action,
                                        reward, terminal,
-                                       latent_next_obs]]
-    mus, sigmas, logpi, rs, ds = mdrnn(action, latent_obs)
-    gmm = gmm_loss(latent_next_obs, mus, sigmas, logpi)
+                                       gt_next_obs]]
+
+    mus, recon_next_obs, sigma_obs, logpi, rs, ds, recon_batch, latents = vaernn(action, gt_obs)
+    gmm = gmm_loss(gt_next_obs, recon_next_obs, sigma_obs, logpi)
     bce = f.binary_cross_entropy_with_logits(ds, terminal)
     if include_reward:
         mse = f.mse_loss(rs, reward)
@@ -147,10 +148,10 @@ def get_loss(latent_obs, action, reward, terminal,
 def data_pass(epoch, train, include_reward): # pylint: disable=too-many-locals
     """ One pass through the data """
     if train:
-        mdrnn.train()
+        vaernn.train()
         loader = train_loader
     else:
-        mdrnn.eval()
+        vaernn.eval()
         loader = test_loader
 
     loader.dataset.load_next_buffer()
@@ -162,14 +163,13 @@ def data_pass(epoch, train, include_reward): # pylint: disable=too-many-locals
 
     pbar = tqdm(total=len(loader.dataset), desc="Epoch {}".format(epoch))
     for i, data in enumerate(loader):
-        obs, action, reward, terminal, next_obs = [arr.to(device) for arr in data]
-
-        # transform obs
-        latent_obs, latent_next_obs = to_latent(obs, next_obs)
+        gt_obs, action, reward, terminal, gt_next_obs = [arr.to(device) for arr in data]
+        #Batch size is 16 and seq_len is 32
+        #gt_obs and gt_next_obs are both size (BSIZE, SEQ_LEN, ASIZE, SIZE, SIZE)
 
         if train:
-            losses = get_loss(latent_obs, action, reward,
-                              terminal, latent_next_obs, include_reward)
+            losses = get_loss(gt_obs, action, reward,
+                              terminal, gt_next_obs, include_reward)
 
             optimizer.zero_grad()
             losses['loss'].backward()

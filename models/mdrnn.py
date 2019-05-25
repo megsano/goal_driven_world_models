@@ -103,6 +103,8 @@ class MDRNN(_MDRNNBase):
 
         ds = gmm_outs[:, :, -1]
 
+        print(mus.size())
+
         return mus, sigmas, logpi, rs, ds
 
 class MDRNNCell(_MDRNNBase):
@@ -127,6 +129,7 @@ class MDRNNCell(_MDRNNBase):
             - rs: (BSIZE) torch tensor
             - ds: (BSIZE) torch tensor
         """
+        print(latent.size())
         in_al = torch.cat([action, latent], dim=1)
 
         next_hidden = self.rnn(in_al, hidden)
