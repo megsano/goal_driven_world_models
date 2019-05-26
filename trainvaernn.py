@@ -75,10 +75,10 @@ if exists(vaernn_file) and not args.noreload:
 transform = transforms.Lambda(
     lambda x: np.transpose(x, (0, 3, 1, 2)) / 255)
 train_loader = DataLoader(
-    RolloutSequenceDataset('./rollouts/', SEQ_LEN, transform, buffer_size=30),
+    RolloutSequenceDataset('/home/gengar888/world-models/rollouts/', SEQ_LEN, transform, buffer_size=30),
     batch_size=BSIZE, num_workers=8, shuffle=True)
 test_loader = DataLoader(
-    RolloutSequenceDataset('./rollouts/', SEQ_LEN, transform, train=False, buffer_size=10),
+    RolloutSequenceDataset('/home/gengar888/world-models/rollouts/', SEQ_LEN, transform, train=False, buffer_size=10),
     batch_size=BSIZE, num_workers=8)
 
 # def to_latent(obs, next_obs):

@@ -55,9 +55,9 @@ transform_test = transforms.Compose([
     transforms.ToTensor(),
 ])
 
-dataset_train = RolloutObservationDataset('./rollouts/',
+dataset_train = RolloutObservationDataset('/home/gengar888/world-models/rollouts/',
                                           transform_train, train=True)
-dataset_test = RolloutObservationDataset('./rollouts/',
+dataset_test = RolloutObservationDataset('/home/gengar888/world-models/rollouts/',
                                          transform_test, train=False)
 train_loader = torch.utils.data.DataLoader(
     dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=2)
@@ -73,6 +73,7 @@ earlystopping = EarlyStopping('min', patience=30)
 # Reconstruction + KL divergence losses summed over all elements and batch
 def loss_function(recon_x, x, mu, logsigma):
     """ VAE loss function """
+    #print(recon_x.size(), x.size(), mu.size(), logsigma.size())
     BCE = F.mse_loss(recon_x, x, size_average=False)
 
     # see Appendix B from VAE paper:

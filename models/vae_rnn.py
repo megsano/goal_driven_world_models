@@ -152,6 +152,8 @@ class VAERNN(_VAERNNBase):
         rs = gmm_outs[:, :, -2]
 
         ds = gmm_outs[:, :, -1]
+        
+        print(rs.size(), ds.size())
 
         #Turn mus into observations
         n_gauss = mus.size(2)
@@ -166,59 +168,59 @@ class VAERNN(_VAERNNBase):
 
         return mus, recon_vae_obs, sigmas, logpi, rs, ds, recon_batch, latents
 
-# class VAERNNCell(_VAERNNBase):
-#     """ MDRNN model for one step forward """
-#     def __init__(self,latents, actions, hiddens, gaussians):
-#         super().__init__(latents, actions, hiddens, gaussians)
-#         self.rnn = nn.LSTMCell(latents + actions, hiddens)
-#         self.vae = VAE(3, latents)
-#
-#     def forward(self, action, ob, hidden): # pylint: disable=arguments-differ
-#         """ ONE STEP forward.
-#
-#         :args actions: (BSIZE, ASIZE) torch tensor
-#         :args latents: (BSIZE, LSIZE) torch tensor
-#         :args hidden: (BSIZE, RSIZE) torch tensor
-#
-#         :returns: mu_nlat, sig_nlat, pi_nlat, r, d, next_hidden, parameters of
-#         the GMM prediction for the next latent, gaussian prediction of the
-#         reward, logit prediction of terminality and next hidden state.
-#             - mu_nlat: (BSIZE, N_GAUSS, LSIZE) torch tensor
-#             - sigma_nlat: (BSIZE, N_GAUSS, LSIZE) torch tensor
-#             - logpi_nlat: (BSIZE, N_GAUSS) torch tensor
-#             - rs: (BSIZE) torch tensor
-#             - ds: (BSIZE) torch tensor
-#         """
-#         recon_batch, latent, logvar = self.vae(ob)
-#
-#         in_al = torch.cat([action, latent], dim=1)
-#
-#         next_hidden = self.rnn(in_al, hidden)
-#         out_rnn = next_hidden[0]
-#
-#         out_full = self.gmm_linear(out_rnn)
-#
-#         stride = self.gaussians * self.latents
-#
-#         mus = out_full[:, :stride]
-#         mus = mus.view(-1, self.gaussians, self.latents)
-#
-#         sigmas = out_full[:, stride:2 * stride]
-#         sigmas = sigmas.view(-1, self.gaussians, self.latents)
-#         sigmas = torch.exp(sigmas)
-#
-#         pi = out_full[:, 2 * stride:2 * stride + self.gaussians]
-#         pi = pi.view(-1, self.gaussians)
-#         logpi = f.log_softmax(pi, dim=-1)
-#
-#         r = out_full[:, -2]
-#
-#         d = out_full[:, -1]
-#
-#         #Turn mus into observations
-#         BSIZE, n_gauss = mus.size(0), mus.size(1)
-#         mu_vae = mus.view(-1, self.latents)
-#         vae_obs = self.vae.decoder(mu_vae)
-#         flat_vae_obs = vae_obs.view(BSIZE, n_gauss, -1)
-#
-#         return mus, flat_vae_obs, sigmas, logpi, r, d, next_hidden, recon_batch, latent, logvar
+class VAERNNCell(_VAERNNBase):
+    """ MDRNN model for one step forward """
+    def __init__(self,latents, actions, hiddens, gaussians):
+        super().__init__(latents, actions, hiddens, gaussians)
+        self.rnn = nn.LSTMCell(latents + actions, hiddens)
+        self.vae = VAE(3, latents)
+
+    def forward(self, action, ob, hidden): # pylint: disable=arguments-differ
+        """ ONE STEP forward.
+
+        :args actions: (BSIZE, ASIZE) torch tensor
+        :args latents: (BSIZE, LSIZE) torch tensor
+        :args hidden: (BSIZE, RSIZE) torch tensor
+
+        :returns: mu_nlat, sig_nlat, pi_nlat, r, d, next_hidden, parameters of
+        the GMM prediction for the next latent, gaussian prediction of the
+        reward, logit prediction of terminality and next hidden state.
+            - mu_nlat: (BSIZE, N_GAUSS, LSIZE) torch tensor
+            - sigma_nlat: (BSIZE, N_GAUSS, LSIZE) torch tensor
+            - logpi_nlat: (BSIZE, N_GAUSS) torch tensor
+            - rs: (BSIZE) torch tensor
+            - ds: (BSIZE) torch tensor
+        """
+        recon_batch, latent, logvar = self.vae(ob)
+
+        in_al = torch.cat([action, latent], dim=1)
+
+        next_hidden = self.rnn(in_al, hidden)
+        out_rnn = next_hidden[0]
+
+        out_full = self.gmm_linear(out_rnn)
+
+        stride = self.gaussians * self.latents
+
+        mus = out_full[:, :stride]
+        mus = mus.view(-1, self.gaussians, self.latents)
+
+        sigmas = out_full[:, stride:2 * stride]
+        sigmas = sigmas.view(-1, self.gaussians, self.latents)
+        sigmas = torch.exp(sigmas)
+
+        pi = out_full[:, 2 * stride:2 * stride + self.gaussians]
+        pi = pi.view(-1, self.gaussians)
+        logpi = f.log_softmax(pi, dim=-1)
+
+        r = out_full[:, -2]
+
+        d = out_full[:, -1]
+
+        #Turn mus into observations
+        BSIZE, n_gauss = mus.size(0), mus.size(1)
+        mu_vae = mus.view(-1, self.latents)
+        vae_obs = self.vae.decoder(mu_vae)
+        flat_vae_obs = vae_obs.view(BSIZE, n_gauss, -1)
+
+        return mus, flat_vae_obs, sigmas, logpi, r, d, next_hidden, recon_batch, latent, logvar

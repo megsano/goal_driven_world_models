@@ -31,7 +31,7 @@ parser.add_argument('--target-return', type=float, help='Stops once the return '
 parser.add_argument('--display', action='store_true', help="Use progress bars if "
                     "specified.")
 parser.add_argument('--max-workers', type=int, help='Maximum number of workers.',
-                    default=32)
+                    default=4)
 args = parser.parse_args()
 
 # Max number of workers. M
