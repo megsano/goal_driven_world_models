@@ -7,13 +7,17 @@ Code for CS 231N Project by Kent Vainio, Sharman Tan, and Megumi Sano
 3. VGG-16 encoder-decoder (trained for 50 epochs): "/home/gengar888/world-models/exp_dir/vgg"
 4. Rollouts: "/home/gengar888/world-models/rollouts" 
 5. MDRNN trained separately from vanilla VAE (trained for default # epochs): "/home/megumisano/world-models/exp_dir/mdrnn"
-6. VAE-RNN (trained for 20 epochs): "/home/gengar888/enhanced_world_models/vaernn_no_gmm"
+6. MDRNN trained separately from VAE with reward (trained for default # epochs): "/home/megumisano/world-models/exp_dir/mdrnn_vae_reward"
+7. VAE-RNN (trained for 50 epochs): "/home/gengar888/enhanced_world_models/vaernn_no_gmm"
+8. Controller trained on MDRNN (trained for 100 iterations with pop-size 16): "/home/megumisano/world-models/exp_dir/ctrl"
+9. Controller trained on VAERNN (trained for 100 iterations with pop-size 16): "/home/megumisano/world-models/exp_dir/ctrl_vaernn"
+10. Controller trained on mdrnn_vae_reward (trained for 100 iterations with pop-size 16): "/home/megumisano/world-models/exp_dir/ctrl_vae_reward"
 
 Still need to...
 - [ ] Train MDRNN on VAE with reward 
-- [ ] Train controller on MDRNN with vanilla VAE 
+- [x] Train controller on MDRNN with vanilla VAE 
 - [ ] Train controller on MDRNN with VAE with reward 
-- [ ] Train controller on VAE-RNN 
+- [x] Train controller on VAE-RNN 
 - [ ] Maybe VGG? 
 
 ## TODO's 
