@@ -8,6 +8,6 @@ class Controller(nn.Module):
         super().__init__()
         self.fc = nn.Linear(latents + recurrents, actions)
 
-    def forward(self, *inputs):
+    def forward(self, *inputs): # latent_mu, hidden[0] 
         cat_in = torch.cat(inputs, dim=1)
         return self.fc(cat_in)
