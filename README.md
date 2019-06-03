@@ -1,4 +1,4 @@
-# Enhanced World Models for Goal-Driven Learning
+# Goal-Driven World Models
 Code for CS 231N Project by Kent Vainio, Sharman Tan, and Megumi Sano
 
 ## Where to find stuff 
