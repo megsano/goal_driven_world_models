@@ -13,34 +13,4 @@ Code for CS 231N Project by Kent Vainio, Sharman Tan, and Megumi Sano
 9. Controller trained on VAERNN (trained for 100 iterations with pop-size 16): "/home/megumisano/world-models/exp_dir/ctrl_vaernn"
 10. Controller trained on mdrnn_vae_reward (trained for 100 iterations with pop-size 16): "/home/megumisano/world-models/exp_dir/ctrl_vae_reward"
 
-Still need to...
-- [ ] Train MDRNN on VAE with reward 
-- [x] Train controller on MDRNN with vanilla VAE 
-- [ ] Train controller on MDRNN with VAE with reward 
-- [x] Train controller on VAE-RNN 
-- [ ] Maybe VGG? 
-
-## TODO's 
-- [ ] Milestone (due Wed 5/15) 
-  - [x] Run WorldModelsExperiments 
-  - [x] Implement simple baseline 
-  - [ ] Train V and M together 
-  - [ ] Train with attention 
-  - [ ] Try out a different environment? Atari
-
-- [ ] Final Report (Tues 6/4) 
- - [ ] Abstract 
- - [ ] Introduction
- - [ ] Methods 
-  - [ ] Train VAE with reward (include fig and eqs) 
-  - [ ] Train VAE and RNN together with RNN predicting reward (include fig and eqs) 
- - [ ] Experiments 
-  - [ ] Train controller on baseline 
-  - [ ] Train controller on baseline but with VAE with reward 
-  - [ ] Train controller on vae-rnn 
-  - [ ] Compare reconstructions for all of the above 
- - [ ] Conclusion 
- 
-- [ ] Poster Session (Tues 6/11) 
-
 ** Most of repo content as of now comes from https://github.com/ctallec/world-models **
