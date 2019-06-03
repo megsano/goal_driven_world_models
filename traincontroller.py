@@ -16,9 +16,10 @@ import cma
 from models import Controller
 from tqdm import tqdm
 import numpy as np
-from utils.misc import RolloutGenerator, ASIZE, RSIZE, LSIZE
+from utils.misc import RolloutGenerator, RolloutGeneratorVAERNN, ASIZE, RSIZE, LSIZE
 from utils.misc import load_parameters
 from utils.misc import flatten_parameters
+import pickle
 
 # parsing
 parser = argparse.ArgumentParser()
@@ -31,7 +32,7 @@ parser.add_argument('--target-return', type=float, help='Stops once the return '
 parser.add_argument('--display', action='store_true', help="Use progress bars if "
                     "specified.")
 parser.add_argument('--max-workers', type=int, help='Maximum number of workers.',
-                    default=32)
+                    default=30)
 args = parser.parse_args()
 
 # Max number of workers. M
@@ -51,7 +52,8 @@ else:
         unlink(join(tmp_dir, fname))
 
 # create ctrl dir if non exitent
-ctrl_dir = join(args.logdir, 'ctrl')
+# ctrl_dir = join(args.logdir, 'ctrl_vaernn')
+ctrl_dir = join(args.logdir, 'ctrl_vae_vanilla_pop64_NEW')
 if not exists(ctrl_dir):
     mkdir(ctrl_dir)
 
@@ -60,6 +62,7 @@ if not exists(ctrl_dir):
 #                           Thread routines                                    #
 ################################################################################
 def slave_routine(p_queue, r_queue, e_queue, p_index):
+    print('went into slave_routine!') 
     """ Thread routine.
 
     Threads interact with p_queue, the parameters queue, r_queue, the result
@@ -84,20 +87,28 @@ def slave_routine(p_queue, r_queue, e_queue, p_index):
     # init routine
     gpu = p_index % torch.cuda.device_count()
     device = torch.device('cuda:{}'.format(gpu) if torch.cuda.is_available() else 'cpu')
+    
+    print('gpu selected!') 
 
     # redirect streams
     sys.stdout = open(join(tmp_dir, str(getpid()) + '.out'), 'a')
     sys.stderr = open(join(tmp_dir, str(getpid()) + '.err'), 'a')
+    
+    print('streams redirected') 
 
     with torch.no_grad():
         r_gen = RolloutGenerator(args.logdir, device, time_limit)
+        #r_gen = RolloutGeneratorVAERNN(args.logdir, device, time_limit)
+        #print("got rgen")
 
         while e_queue.empty():
             if p_queue.empty():
-                sleep(.1)
+                sleep(0)
             else:
+                print('went into else statement because p_queue wasnt empty') 
                 s_id, params = p_queue.get()
                 r_queue.put((s_id, r_gen.rollout(params)))
+                print("rqueue is not empty anymore")
 
 
 ################################################################################
@@ -108,7 +119,9 @@ r_queue = Queue()
 e_queue = Queue()
 
 for p_index in range(num_workers):
+    print('defined stuff') 
     Process(target=slave_routine, args=(p_queue, r_queue, e_queue, p_index)).start()
+    print('after process started')
 
 
 ################################################################################
@@ -117,7 +130,7 @@ for p_index in range(num_workers):
 def evaluate(solutions, results, rollouts=100):
     """ Give current controller evaluation.
 
-    Evaluation is minus the cumulated reward averaged over rollout runs.
+    Evaluation is minus the cumulated \ averaged over rollout runs.
 
     :args solutions: CMA set of solutions
     :args results: corresponding results
@@ -135,7 +148,7 @@ def evaluate(solutions, results, rollouts=100):
     print("Evaluating...")
     for _ in tqdm(range(rollouts)):
         while r_queue.empty():
-            sleep(.1)
+            sleep(0)
         restimates.append(r_queue.get()[1])
 
     return best_guess, np.mean(restimates), np.std(restimates)
@@ -144,6 +157,9 @@ def evaluate(solutions, results, rollouts=100):
 #                           Launch CMA                                         #
 ################################################################################
 controller = Controller(LSIZE, RSIZE, ASIZE)  # dummy instance
+
+train_reward_list = []
+test_reward_list = [] 
 
 # define current best and load parameters
 cur_best = None
@@ -161,6 +177,7 @@ es = cma.CMAEvolutionStrategy(flatten_parameters(parameters), 0.1,
 
 epoch = 0
 log_step = 3
+
 while not es.stop():
     if cur_best is not None and - cur_best > args.target_return:
         print("Already better than target, breaking...")
@@ -173,13 +190,15 @@ while not es.stop():
     for s_id, s in enumerate(solutions):
         for _ in range(n_samples):
             p_queue.put((s_id, s))
+            
+    print('parameters pushed into p_queue') 
 
     # retrieve results
     if args.display:
         pbar = tqdm(total=pop_size * n_samples)
     for _ in range(pop_size * n_samples):
         while r_queue.empty():
-            sleep(.1)
+            sleep(0)
         r_s_id, r = r_queue.get()
         r_list[r_s_id] += r / n_samples
         if args.display:
@@ -189,10 +208,17 @@ while not es.stop():
 
     es.tell(solutions, r_list)
     es.disp()
+    
+    train_reward_list.append(r_list)
+    pickle.dump((train_reward_list), open('train_controller_on_vae_vanilla_train.p', 'wb'))
 
     # evaluation and saving
     if epoch % log_step == log_step - 1:
         best_params, best, std_best = evaluate(solutions, r_list)
+        test_reward_list.append(best)
+        #pickle.dump((reward_list), open('train_controller_on_vaernn.p', 'wb'))
+        #pickle.dump((reward_list), open('train_controller_on_vae_reward_eval_pop64.p', 'wb'))
+        pickle.dump((test_reward_list), open('train_controller_on_vae_vanilla_test.p', 'wb'))
         print("Current evaluation: {}".format(best))
         if not cur_best or cur_best > best:
             cur_best = best
@@ -207,8 +233,9 @@ while not es.stop():
             print("Terminating controller training with value {}...".format(best))
             break
 
-
     epoch += 1
+    if epoch == 80:
+        break 
 
 es.result_pretty()
 e_queue.put('EOP')
