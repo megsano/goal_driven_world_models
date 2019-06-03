@@ -5,6 +5,7 @@ import torch
 from torchvision import transforms
 import numpy as np
 from models import MDRNNCell, VAE, Controller
+from collections import OrderedDict
 import gym
 import gym.envs.box2d
 
@@ -13,7 +14,7 @@ gym.envs.box2d.car_racing.STATE_W, gym.envs.box2d.car_racing.STATE_H = 64, 64
 
 # Hardcoded for now
 ASIZE, LSIZE, RSIZE, RED_SIZE, SIZE =\
-    3, 32, 256, 64, 64
+    3, 32, 256, 64, 96
 
 # Same
 transform = transforms.Compose([
@@ -107,7 +108,7 @@ class RolloutGenerator(object):
         """ Build vae, rnn, controller and environment. """
         # Loading world model and vae
         vae_file, rnn_file, ctrl_file = \
-            [join(mdir, m, 'best.tar') for m in ['vae', 'mdrnn', 'ctrl']]
+            [join(mdir, m, 'best.tar') for m in ['vae', 'mdrnn', 'ctrl_vae_vanilla_pop64_NEW']]
 
         assert exists(vae_file) and exists(rnn_file),\
             "Either vae or mdrnn is untrained."
@@ -122,11 +123,11 @@ class RolloutGenerator(object):
                       m, s['epoch'], s['precision']))
 
         self.vae = VAE(3, LSIZE).to(device)
-        self.vae.load_state_dict(vae_state['state_dict'])
+        self.vae.load_state_dict(vae_state['state_dict'], strict=False)
 
         self.mdrnn = MDRNNCell(LSIZE, ASIZE, RSIZE, 5).to(device)
         self.mdrnn.load_state_dict(
-            {k.strip('_l0'): v for k, v in rnn_state['state_dict'].items()})
+            {k.strip('_l0'): v for k, v in rnn_state['state_dict'].items()}, strict=False)
 
         self.controller = Controller(LSIZE, RSIZE, ASIZE).to(device)
 
@@ -156,7 +157,7 @@ class RolloutGenerator(object):
             - action: 1D np array
             - next_hidden (1 x 256) torch tensor
         """
-        _, latent_mu, _ = self.vae(obs)
+        _, latent_mu, _ = self.vae(obs) # added _ because vae with reward also outputs predicted reward
         action = self.controller(latent_mu, hidden[0])
         _, _, _, _, _, next_hidden = self.mdrnn(action, latent_mu, hidden)
         return action.squeeze().cpu().numpy(), next_hidden
@@ -196,5 +197,283 @@ class RolloutGenerator(object):
 
             cumulative += reward
             if done or i > self.time_limit:
+                return - cumulative
+            i += 1
+
+class RolloutGeneratorVAERNN(object):
+    """ Utility to generate rollouts.
+
+    Encapsulate everything that is needed to generate rollouts in the TRUE ENV
+    using a controller with previously trained VAE and MDRNN.
+
+    :attr vae: VAE model loaded from mdir/vae
+    :attr mdrnn: MDRNN model loaded from mdir/mdrnn
+    :attr controller: Controller, either loaded from mdir/ctrl or randomly
+        initialized
+    :attr env: instance of the CarRacing-v0 gym environment
+    :attr device: device used to run VAE, MDRNN and Controller
+    :attr time_limit: rollouts have a maximum of time_limit timesteps
+    """
+    def __init__(self, mdir, device, time_limit):
+        """ Build vaernn, controller and environment. """
+        # Loading world model and vae
+        vaernn_file, ctrl_file = \
+            [join(mdir, m, 'best.tar') for m in ['vaernn', 'ctrl_vaernn_frozen']] # vaernn with gmm 
+
+        assert exists(vaernn_file),\
+            "Either vaernn is untrained."
+
+        vaernn_state = torch.load(vaernn_file, map_location={'cuda:0': str(device)})
+
+        print("Loading VAERNN at epoch {} with test loss {}".format(vaernn_state['epoch'], vaernn_state['precision']))
+        
+        # Convert state dict so that we can load just VAE weights 
+        new = OrderedDict()
+        for key, value in vaernn_state['state_dict'].items():
+            if key.startswith('vae'):
+                prev = key
+                new[prev[4:]] = value
+        vaernn_state['state_dict'].update(new)
+        
+        self.vae = VAE(3, LSIZE).to(device)
+        self.vae.load_state_dict(vaernn_state['state_dict'], strict=False)
+        
+        vaernn_state = torch.load(vaernn_file, map_location={'cuda:0': str(device)})
+        
+        # Convert state dict so that we can load just RNN weights 
+        new = OrderedDict()
+        for key, value in vaernn_state['state_dict'].items():
+            if key.startswith('rnn'):
+                prev = key
+                new[prev[4:]] = value
+        vaernn_state['state_dict'].update(new)
+        
+        self.rnn = torch.nn.LSTMCell(LSIZE + ASIZE, RSIZE).to(device)
+        self.rnn.load_state_dict(
+            {k.strip('_l0'): v for k, v in vaernn_state['state_dict'].items()}, strict=False)
+
+#         self.vaernn = VAERNN_NOGMM(LSIZE, ASIZE, RSIZE, 5).to(device)
+#         self.vaernn.load_state_dict(vaernn_state['state_dict'])
+
+        self.controller = Controller(LSIZE, RSIZE, ASIZE).to(device)
+
+        # load controller if it was previously saved
+        if exists(ctrl_file):
+            ctrl_state = torch.load(ctrl_file, map_location={'cuda:0': str(device)})
+            print("Loading Controller with reward {}".format(
+                ctrl_state['reward']))
+            self.controller.load_state_dict(ctrl_state['state_dict'])
+
+        self.env = gym.make('CarRacing-v0')
+        self.device = device
+
+        self.time_limit = time_limit
+
+    def get_action_and_transition(self, obs, hidden):
+        """ Get action and transition.
+
+        Encode obs to latent using the VAE, then obtain estimation for next
+        latent and next hidden state using the MDRNN and compute the controller
+        corresponding action.
+
+        :args obs: current observation (1 x 3 x 64 x 64) torch tensor
+        :args hidden: current hidden state (1 x 256) torch tensor
+
+        :returns: (action, next_hidden)
+            - action: 1D np array
+            - next_hidden (1 x 256) torch tensor
+        """
+        
+        _, latent_mu, _ = self.vae(obs)
+       
+        
+        action = self.controller(latent_mu, hidden) 
+        
+        
+        _, next_hidden = self.rnn(torch.cat([action, latent_mu], dim=-1)) #self.mdrnn(action, latent_mu, hidden) how do we know hidden?
+        
+        return action.squeeze().cpu().numpy(), next_hidden
+
+    def rollout(self, params, render=False):
+        """ Execute a rollout and returns minus cumulative reward.
+
+        Load :params: into the controller and execute a single rollout. This
+        is the main API of this class.
+
+        :args params: parameters as a single 1D np array
+
+        :returns: minus cumulative reward
+        """
+        # copy params into the controller
+        if params is not None:
+            load_parameters(params, self.controller)
+
+        obs = self.env.reset()
+
+        # This first render is required !
+        self.env.render()
+
+        hidden = torch.zeros(1, RSIZE).to(self.device)
+#         hidden = [
+#             torch.zeros(1, RSIZE).to(self.device)
+#             for _ in range(1)]
+
+        cumulative = 0
+        i = 0
+        while True:
+            obs = transform(obs).unsqueeze(0).to(self.device)
+            action, hidden = self.get_action_and_transition(obs, hidden)
+            obs, reward, done, _ = self.env.step(action)
+
+            if render:
+                self.env.render()
+
+            cumulative += reward
+            if done or i > self.time_limit:
+                print("returned rgen")
+                return - cumulative
+            i += 1
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+class DreamRolloutGeneratorVAERNN(object):
+    """ Utility to generate rollouts.
+
+    Encapsulate everything that is needed to generate rollouts in the TRUE ENV
+    using a controller with previously trained VAE and MDRNN.
+
+    :attr vae: VAE model loaded from mdir/vae
+    :attr mdrnn: MDRNN model loaded from mdir/mdrnn
+    :attr controller: Controller, either loaded from mdir/ctrl or randomly
+        initialized
+    :attr env: instance of the CarRacing-v0 gym environment
+    :attr device: device used to run VAE, MDRNN and Controller
+    :attr time_limit: rollouts have a maximum of time_limit timesteps
+    """
+    def __init__(self, mdir, device, time_limit):
+        """ Build vaernn, controller and environment. """
+        # Loading world model and vae
+        vaernn_file, ctrl_file = \
+            [join(mdir, m, 'best.tar') for m in ['vaernn', 'ctrl_vaernn_frozen_dream']] 
+
+        assert exists(vaernn_file),\
+            "Either vaernn is untrained."
+
+        vaernn_state = torch.load(vaernn_file, map_location={'cuda:0': str(device)})
+
+        print("Loading VAERNN at epoch {} with test loss {}".format(vaernn_state['epoch'], vaernn_state['precision']))
+        
+        # Convert state dict so that we can load just VAE weights 
+        new = OrderedDict()
+        for key, value in vaernn_state['state_dict'].items():
+            if key.startswith('vae'):
+                prev = key
+                new[prev[4:]] = value
+        vaernn_state['state_dict'].update(new)
+        
+        self.vae = VAE(3, LSIZE).to(device)
+        self.vae.load_state_dict(vaernn_state['state_dict'], strict=False)
+        
+        vaernn_state = torch.load(vaernn_file, map_location={'cuda:0': str(device)})
+        
+        # Convert state dict so that we can load just RNN weights 
+        new = OrderedDict()
+        for key, value in vaernn_state['state_dict'].items():
+            if key.startswith('rnn'):
+                prev = key
+                new[prev[4:]] = value
+        vaernn_state['state_dict'].update(new)
+        
+        self.rnn = torch.nn.LSTMCell(LSIZE + ASIZE, RSIZE).to(device)
+        self.rnn.load_state_dict(
+            {k.strip('_l0'): v for k, v in vaernn_state['state_dict'].items()}, strict=False)
+
+#         self.vaernn = VAERNN_NOGMM(LSIZE, ASIZE, RSIZE, 5).to(device)
+#         self.vaernn.load_state_dict(vaernn_state['state_dict'])
+
+        self.controller = Controller(LSIZE, RSIZE, ASIZE).to(device)
+
+        # load controller if it was previously saved
+        if exists(ctrl_file):
+            ctrl_state = torch.load(ctrl_file, map_location={'cuda:0': str(device)})
+            print("Loading Controller with reward {}".format(
+                ctrl_state['reward']))
+            self.controller.load_state_dict(ctrl_state['state_dict'])
+
+        self.env = gym.make('CarRacing-v0')
+        self.device = device
+
+        self.time_limit = time_limit
+
+    def get_action_and_transition(self, latent_mu, hidden):
+        """ Get action and transition.
+
+        Encode obs to latent using the VAE, then obtain estimation for next
+        latent and next hidden state using the MDRNN and compute the controller
+        corresponding action.
+
+        :args obs: current observation (1 x 3 x 64 x 64) torch tensor
+        :args hidden: current hidden state (1 x 256) torch tensor
+
+        :returns: (action, next_hidden)
+            - action: 1D np array
+            - next_hidden (1 x 256) torch tensor
+        """
+        
+#         _, latent_mu, _ = self.vae(obs)
+       
+        
+        action = self.controller(latent_mu, hidden) 
+        
+        
+        _, next_hidden = self.rnn(torch.cat([action, latent_mu], dim=-1)) #self.mdrnn(action, latent_mu, hidden) how do we know hidden?
+       
+        
+        return action.squeeze().cpu().numpy(), next_hidden
+
+    def rollout(self, params, render=False):
+        """ Execute a rollout and returns minus cumulative reward.
+
+        Load :params: into the controller and execute a single rollout. This
+        is the main API of this class.
+
+        :args params: parameters as a single 1D np array
+
+        :returns: minus cumulative reward
+        """
+        # copy params into the controller
+        if params is not None:
+            load_parameters(params, self.controller)
+
+        obs = self.env.reset()
+
+        # This first render is required !
+        self.env.render()
+
+        hidden = torch.zeros(1, RSIZE).to(self.device)
+#         hidden = [
+#             torch.zeros(1, RSIZE).to(self.device)
+#             for _ in range(1)]
+
+        cumulative = 0
+        i = 0
+        while True:
+            obs = transform(obs).unsqueeze(0).to(self.device)
+            action, hidden = self.get_action_and_transition(obs, hidden)
+            obs, reward, done, _ = self.env.step(action)
+
+            if render:
+                self.env.render()
+
+            cumulative += reward
+            if done or i > self.time_limit:
+                print("returned rgen")
                 return - cumulative
             i += 1
