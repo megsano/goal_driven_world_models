@@ -2,7 +2,7 @@
 Code for CS 231N Project by Kent Vainio, Sharman Tan, and Megumi Sano
 
 ## To train world models: 
-1. run `python trainmdrnn.py` with vae model either set to `vae` or `vae_reward_eval`
+1. run `python trainmdrnn.py` with vae model either set to `vae` or `vae_reward_eval` (must run `python trainvae.py` or `python trainvaereward.py` to train VAE first) 
 2. run `python trainvaernn.py` to train VAE-RNN-G 
 3. run `python trainvaernn_no_gmm.py` to train VAE-RNN-O 
 
