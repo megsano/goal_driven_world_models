@@ -10,6 +10,7 @@ Code for CS 231N Project by Kent Vainio, Sharman Tan, and Megumi Sano
 4. run `python traincontroller.py` with desired world model folder below: 
 
 ## Model weights 
+(These are stored in our Google Cloud VM.) 
 1. Vanilla VAE (trained for 50 epochs): "/home/megumisano/world-models/exp_dir/vae"
 2. VAE with reward (trained for 50 epochs): "/home/megumisano/world-models/exp_dir/vae_reward_eval"
 3. VGG-16 encoder-decoder (trained for 50 epochs): "/home/gengar888/world-models/exp_dir/vgg"
