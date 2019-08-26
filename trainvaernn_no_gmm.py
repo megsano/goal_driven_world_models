@@ -37,7 +37,6 @@ torch.manual_seed(231)
 # constants
 BSIZE = 16
 SEQ_LEN = 32
-#Accidentally stopped training but can just train for 9 more after the best!
 epochs = 9
 
 #Pickle dictionary
@@ -120,40 +119,36 @@ def get_loss(gt_obs, action, reward, terminal,
     recon_vae_obs, latents, rs, ds, recon_batch, gt_obs_mu, gt_obs_logsigma, mus, sigmas = vaernn_nogmm(action, gt_obs)
     #Reconstruction loss comparing predicted next observation to actual next observation
     obs_l = obs_loss(gt_next_obs, recon_vae_obs)
-    
+
     gt_obs = gt_obs.transpose(1,0)
     gt_obs = f.upsample(gt_obs.view(-1, 3, SIZE, SIZE), size=RED_SIZE, mode='bilinear', align_corners=True)
-    
+
 #     #Reconstruction loss for initial VAE encodings
     R = f.mse_loss(recon_batch, gt_obs, size_average=False)
-    
+
 #     #KLD loss for initial VAE encodings
     #KLD loss for latent states
     KLD_latent = -0.5 * torch.sum(1 + 2 * sigmas - mus.pow(2) - (2 * sigmas).exp())
     KLD = -0.5 * torch.sum(1 + 2 * gt_obs_logsigma - gt_obs_mu.pow(2) - (2 * gt_obs_logsigma).exp())
 
     bce = f.binary_cross_entropy_with_logits(ds, terminal)
-    
+
     scale = 2 * 3 * SIZE * SIZE + 2 * LSIZE
-    
-    #print(rs.size(), reward.size())
-    
+
     if include_reward:
         mask_common = (reward < 0) & (reward > -2)
         mask_rare = 1 - mask_common
         #print(mask_common, mask_rare)
         rare_r_pred, rare_r_true = rs[mask_rare], reward[mask_rare]
         common_r_pred,  common_r_true = rs[mask_common], reward[mask_common]
-        
+
         rare_num = float(list(rare_r_pred.size())[0])
         common_num = float(list(common_r_pred.size())[0])
-        
-        #print(1/rare_num, 1/common_num)
-        
+
         #mse = f.mse_loss(rs, reward)
         common_mse = f.mse_loss(common_r_pred, common_r_true)
         rare_mse = f.mse_loss(rare_r_pred, rare_r_true)
-        
+
         mse = common_mse
         if rare_num > 0.0:
             mse = (common_mse * 1/common_num) + (rare_mse * 1/rare_num)
@@ -164,7 +159,7 @@ def get_loss(gt_obs, action, reward, terminal,
     else:
         mse = 0
         scale += 1
-        
+
     loss = (obs_l + bce + mse + R + KLD + KLD_latent) / scale
 
     return dict(obs_l=obs_l, bce=bce, mse=mse, R=R, KLD=KLD, KLD_latent=KLD_latent, loss=loss), common_mse, rare_mse
@@ -183,7 +178,7 @@ def data_pass(epoch, train, include_reward): # pylint: disable=too-many-locals
 
     y_true = np.array([])
     y_pred = np.array([])
-    
+
     cum_loss = 0
     cum_obs = 0
     cum_bce = 0
@@ -271,5 +266,5 @@ for e in range(1,epochs):
         print("End of Training because of early stopping at epoch {}".format(e))
         pickle.dump(pd, open('vae_rnn_no_gmm.p', 'wb'))
         break
-    
+
 pickle.dump(pd, open('vae_rnn_no_gmm.p', 'wb'))

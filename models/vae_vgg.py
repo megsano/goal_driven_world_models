@@ -21,12 +21,7 @@ class Decoder(nn.Module):
         self.deconv2 = nn.ConvTranspose2d(128, 64, 5, stride=2)
         self.deconv3 = nn.ConvTranspose2d(64, 32, 6, stride=2)
         self.deconv4 = nn.ConvTranspose2d(32, img_channels, 6, stride=2)
-        
-#         self.fc1 = nn.Linear(latent_size, 1024)
-#         self.deconv1 = nn.ConvTranspose2d(1024, 128, 5, stride=2)
-#         self.deconv2 = nn.ConvTranspose2d(128, 64, 5, stride=4)
-#         self.deconv3 = nn.ConvTranspose2d(64, 32, 3, stride=3)
-#         self.deconv4 = nn.ConvTranspose2d(32, img_channels, 8, stride=4)
+
 
     def forward(self, x): # pylint: disable=arguments-differ
         x = F.relu(self.fc1(x))
@@ -42,39 +37,19 @@ class Encoder(nn.Module): # pylint: disable=too-many-instance-attributes
     def __init__(self, img_channels, latent_size):
         super(Encoder, self).__init__()
 
-#         self.latent_size = latent_size
-        
-#         self.resize_conv = nn.ConvTranspose2d(img_channels, img_channels, 4, stride=4)
-        
-#         resnet152 = models.resnet152(pretrained=True)
-#         modules=list(resnet152.children())[:-1]
-#         self.res_base=nn.Sequential(*modules)
-        
-#         for p in self.res_base.parameters():
-#             p.requires_grad = False
-            
-#         self.classifier = nn.Linear(2048, latent_size)
-        
-#     def forward(self, x):
-#         x = self.resize_conv(x)
-#         x = self.res_base(x)
-#         x = x.squeeze()
-#         x = self.classifier(x)
-#         return x
-        
 
         self.latent_size = latent_size
         self.img_channels = img_channels
-        
+
         self.resize_conv = nn.ConvTranspose2d(img_channels, img_channels, 4, stride=4)
-        
+
         self.model_conv = torchvision.models.vgg16(pretrained=True)
         for param in self.model_conv.parameters():
             param.requires_grad = False
 
         # Parameters of newly constructed modules have requires_grad=True by default
         num_ftrs = self.model_conv.classifier._modules['6'].in_features
-        self.model_conv.classifier._modules['6'] = nn.Linear(num_ftrs, latent_size)            
+        self.model_conv.classifier._modules['6'] = nn.Linear(num_ftrs, latent_size)
 
     def forward(self, x): # pylint: disable=arguments-differ
         x = self.model_conv(x)

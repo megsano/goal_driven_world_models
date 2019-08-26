@@ -1,4 +1,7 @@
 """ Training VAE """
+'''
+Taken from ctallec repo. 
+'''
 import argparse
 from os.path import join, exists
 from os import mkdir

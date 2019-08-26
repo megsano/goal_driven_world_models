@@ -3,7 +3,7 @@ import argparse
 from os.path import join, exists
 from os import mkdir
 import numpy as np
-import pandas as pd 
+import pandas as pd
 
 import torch
 import torch.utils.data
@@ -12,10 +12,10 @@ from torch.nn import functional as F
 from torchvision import transforms
 from torchvision.utils import save_image
 
-import pickle 
+import pickle
 
 from sklearn.metrics import precision_recall_fscore_support
-from collections import Counter 
+from collections import Counter
 
 from models.vae_reward import VAE
 
@@ -56,12 +56,12 @@ transform = transforms.Compose([
     transforms.ToTensor()
 ])
 
-SEQ_LEN = 32 
+SEQ_LEN = 32
 BSIZE=32
 
-dataset_train = RolloutRewardDataset('/home/gengar888/world-models/rollouts/', 
+dataset_train = RolloutRewardDataset('/home/gengar888/world-models/rollouts/',
                                           transform, train=True)
-dataset_test = RolloutRewardDataset('/home/gengar888/world-models/rollouts/', 
+dataset_test = RolloutRewardDataset('/home/gengar888/world-models/rollouts/',
                                          transform, train=False)
 
 train_loader = torch.utils.data.DataLoader(
@@ -91,7 +91,7 @@ def loss_function(recon_x, x, mu, logsigma, predicted_reward, actual_reward):
     KLD = -0.5 * torch.sum(1 + 2 * logsigma - mu.pow(2) - (2 * logsigma).exp())
 
     actuals = []
-    for i, act in enumerate(actual_reward): 
+    for i, act in enumerate(actual_reward):
         if act.item() > -50 and act.item() < 0:
             actual = 0 # torch.tensor(0)#torch.tensor([1, 0, 0])
         elif act.item() <= -50:
@@ -99,14 +99,14 @@ def loss_function(recon_x, x, mu, logsigma, predicted_reward, actual_reward):
         else:
             actual = 2 #torch.tensor(2)#torch.tensor([0, 0, 1])
         actuals.append(actual)
-        
+
     actuals_tensor = torch.tensor(actuals)
-    predicted_reward = predicted_reward.to(device) 
+    predicted_reward = predicted_reward.to(device)
     actuals_tensor = actuals_tensor.to(device)
-    
+
     RPL = F.cross_entropy(predicted_reward, actuals_tensor)
     predicted_reward_indices = torch.argmax(predicted_reward,1).data.cpu().numpy()
-    
+
     return BCE + KLD + RPL, actuals, predicted_reward_indices
 
 
@@ -115,11 +115,11 @@ def train(epoch):
     model.train()
     dataset_train.load_next_buffer()
     train_loss = 0
-    
-#     default_reward = {'true_pos':0, 'true_neg':0, 'false_pos':0, 'false_neg':0}
-#     offtrack_reward = {'true_pos':0, 'true_neg':0, 'false_pos':0, 'false_neg':0}
-#     else_reward = {'true_pos':0, 'true_neg':0, 'false_pos':0, 'false_neg':0}
-    
+
+    default_reward = {'true_pos':0, 'true_neg':0, 'false_pos':0, 'false_neg':0}
+    offtrack_reward = {'true_pos':0, 'true_neg':0, 'false_pos':0, 'false_neg':0}
+    else_reward = {'true_pos':0, 'true_neg':0, 'false_pos':0, 'false_neg':0}
+
     total_prfs_dict = {'macro': (0, 0, 0), 'micro': (0, 0, 0), 'weighted':(0, 0, 0), 'none':(0, 0, 0)}
     y_true = np.array([])
     y_pred = np.array([])
@@ -132,14 +132,14 @@ def train(epoch):
         recon_batch, mu, logvar, predicted_reward = model(obs)
         actual_reward = reward
         loss, actuals, predicted_reward_indices = loss_function(recon_batch, obs, mu, logvar, predicted_reward, actual_reward)
-        
-#         total_prfs_dict['macro'] += prfs['macro']
-#         total_prfs_dict['micro'] += prfs['micro']
-#         total_prfs_dict['weighted'] += prfs['weighted']
 
-        y_true = np.append(y_true, actuals) 
-        y_pred = np.append(y_pred, predicted_reward_indices) 
-        
+        total_prfs_dict['macro'] += prfs['macro']
+        total_prfs_dict['micro'] += prfs['micro']
+        total_prfs_dict['weighted'] += prfs['weighted']
+
+        y_true = np.append(y_true, actuals)
+        y_pred = np.append(y_pred, predicted_reward_indices)
+
         loss.backward()
         train_loss += loss.item()
         optimizer.step()
@@ -148,66 +148,66 @@ def train(epoch):
                 epoch, batch_idx * len(obs), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader),
                 loss.item() / len(obs)))
-            
-#     total_prfs_dict['macro'] /= len(train_loader.dataset)
-#     total_prfs_dict['micro'] /= len(train_loader.dataset)
-#     total_prfs_dict['weighted'] /= len(train_loader.dataset)
 
-#     default_p = float(default_reward['true_pos']) / float(default_reward['true_pos'] + default_reward['false_pos']) 
-#     offtrack_p = float(offtract_reward['true_pos']) / float(offtract_reward['true_pos'] + offtrack_reward['false_pos']) 
-#     else_p = float(else_reward['true_pos']) / float(else_reward['true_pos'] + else_reward['false_pos']) 
-    
-#     default_r = float(default_reward['true_pos']) / float(default_reward['true_pos'] + default_reward['false_neg']) 
-#     offtrack_p = float(offtract_reward['true_pos']) / float(offtract_reward['true_pos'] + offtrack_reward['false_neg']) 
-#     else_p = float(else_reward['true_pos']) / float(else_reward['true_pos'] + else_reward['false_neg']) 
-    
-#     default_f1 = 2 * default_p * default_r / (default_p + default_r) 
-#     offtrack_f1 = 2 * offtrack_p * offtrack_r / (offtrack_p + offtrack_r) 
-#     else_f1 = 2 * else_p * else_r / (else_p + else_r) 
+    total_prfs_dict['macro'] /= len(train_loader.dataset)
+    total_prfs_dict['micro'] /= len(train_loader.dataset)
+    total_prfs_dict['weighted'] /= len(train_loader.dataset)
+
+    default_p = float(default_reward['true_pos']) / float(default_reward['true_pos'] + default_reward['false_pos'])
+    offtrack_p = float(offtract_reward['true_pos']) / float(offtract_reward['true_pos'] + offtrack_reward['false_pos'])
+    else_p = float(else_reward['true_pos']) / float(else_reward['true_pos'] + else_reward['false_pos'])
+
+    default_r = float(default_reward['true_pos']) / float(default_reward['true_pos'] + default_reward['false_neg'])
+    offtrack_p = float(offtract_reward['true_pos']) / float(offtract_reward['true_pos'] + offtrack_reward['false_neg'])
+    else_p = float(else_reward['true_pos']) / float(else_reward['true_pos'] + else_reward['false_neg'])
+
+    default_f1 = 2 * default_p * default_r / (default_p + default_r)
+    offtrack_f1 = 2 * offtrack_p * offtrack_r / (offtrack_p + offtrack_r)
+    else_f1 = 2 * else_p * else_r / (else_p + else_r)
 
     y_true = y_true.astype(int)
     y_pred = y_pred.astype(int)
-    
+
     y_pred_counts = Counter(y_pred)
     y_true_counts = Counter(y_true)
-    
+
     for avr in ['macro', 'micro', 'weighted']:
         total_prfs_dict[avr] = precision_recall_fscore_support(y_true, y_pred, average=avr)
-    
+
     total_prfs_dict['none'] = precision_recall_fscore_support(y_true, y_pred, average=None)
-    
+
     print('====> Epoch: {} Average loss: {:.4f}'.format(
         epoch, train_loss / len(train_loader.dataset)))
-    
+
     print('====> Epoch: {} Average macro: {} Average micro: {}  Average weighted: {}'.format(
         epoch, total_prfs_dict['macro'], total_prfs_dict['micro'], total_prfs_dict['weighted']))
-    
+
     print(total_prfs_dict['none'])
-    
+
     print("prediction counts: {}".format(y_pred_counts))
     print("actual counts: {}".format(y_true_counts))
-    
+
     train_loss_list.append(train_loss / len(train_loader.dataset))
     train_total_prfs_dict_list.append(total_prfs_dict)
     train_y_pred_counts_list.append(y_pred_counts)
     train_y_true_counts_list.append(y_true_counts)
-   
+
 
 
 def test():
     """ One test epoch """
-#     default_reward = {'true_pos':0, 'true_neg':0, 'false_pos':0, 'false_neg':0}
-#     offtrack_reward = {'true_pos':0, 'true_neg':0, 'false_pos':0, 'false_neg':0}
-#     else_reward = {'true_pos':0, 'true_neg':0, 'false_pos':0, 'false_neg':0}
-    
+    default_reward = {'true_pos':0, 'true_neg':0, 'false_pos':0, 'false_neg':0}
+    offtrack_reward = {'true_pos':0, 'true_neg':0, 'false_pos':0, 'false_neg':0}
+    else_reward = {'true_pos':0, 'true_neg':0, 'false_pos':0, 'false_neg':0}
+
     model.eval()
     dataset_test.load_next_buffer()
     test_loss = 0
-    
+
     total_prfs_dict = {'macro': (0, 0, 0), 'micro': (0, 0, 0), 'weighted':(0, 0, 0), 'none':(0, 0, 0)}
     y_true = np.array([])
     y_pred = np.array([])
-    
+
     with torch.no_grad():
         for data in test_loader:
             obs, reward = data
@@ -217,58 +217,58 @@ def test():
             recon_batch, mu, logvar, predicted_reward = model(obs)
             loss, actuals, predicted_reward_indices  = loss_function(recon_batch, obs, mu, logvar, predicted_reward, actual_reward)
             test_loss += loss.item()
-            
-            y_true = np.append(y_true, actuals) 
-            y_pred = np.append(y_pred, predicted_reward_indices) 
-            
-#             total_prfs_dict['macro'] += prfs['macro']
-#             total_prfs_dict['micro'] += prfs['micro']
-#             total_prfs_dict['weighted'] += prfs['weighted']
-            
+
+            y_true = np.append(y_true, actuals)
+            y_pred = np.append(y_pred, predicted_reward_indices)
+
+            total_prfs_dict['macro'] += prfs['macro']
+            total_prfs_dict['micro'] += prfs['micro']
+            total_prfs_dict['weighted'] += prfs['weighted']
+
     test_loss /= len(test_loader.dataset)
-    
+
     y_true = y_true.astype(int)
     y_pred = y_pred.astype(int)
-    
+
     y_pred_counts = Counter(y_pred)
     y_true_counts = Counter(y_true)
-    
+
     for avr in ['macro', 'micro', 'weighted']:
         total_prfs_dict[avr] = precision_recall_fscore_support(y_true, y_pred, average=avr)
-    
+
     total_prfs_dict['none'] = precision_recall_fscore_support(y_true, y_pred, average=None)
-    
-#     total_prfs_dict['macro'] /= len(test_loader.dataset)
-#     total_prfs_dict['micro'] /=  len(test_loader.dataset)
-#     total_prfs_dict['weighted'] /=  len(test_loader.dataset)
-    
-#     default_p = float(default_reward['true_pos']) / float(default_reward['true_pos'] + default_reward['false_pos']) 
-#     offtrack_p = float(offtract_reward['true_pos']) / float(offtract_reward['true_pos'] + offtrack_reward['false_pos']) 
-#     else_p = float(else_reward['true_pos']) / float(else_reward['true_pos'] + else_reward['false_pos']) 
-    
-#     default_r = float(default_reward['true_pos']) / float(default_reward['true_pos'] + default_reward['false_neg']) 
-#     offtrack_p = float(offtract_reward['true_pos']) / float(offtract_reward['true_pos'] + offtrack_reward['false_neg']) 
-#     else_p = float(else_reward['true_pos']) / float(else_reward['true_pos'] + else_reward['false_neg']) 
-    
-#     default_f1 = 2 * default_p * default_r / (default_p + default_r) 
-#     offtrack_f1 = 2 * offtrack_p * offtrack_r / (offtrack_p + offtrack_r) 
-#     else_f1 = 2 * else_p * else_r / (else_p + else_r) 
-    
-    
+
+    total_prfs_dict['macro'] /= len(test_loader.dataset)
+    total_prfs_dict['micro'] /=  len(test_loader.dataset)
+    total_prfs_dict['weighted'] /=  len(test_loader.dataset)
+
+    default_p = float(default_reward['true_pos']) / float(default_reward['true_pos'] + default_reward['false_pos'])
+    offtrack_p = float(offtract_reward['true_pos']) / float(offtract_reward['true_pos'] + offtrack_reward['false_pos'])
+    else_p = float(else_reward['true_pos']) / float(else_reward['true_pos'] + else_reward['false_pos'])
+
+    default_r = float(default_reward['true_pos']) / float(default_reward['true_pos'] + default_reward['false_neg'])
+    offtrack_p = float(offtract_reward['true_pos']) / float(offtract_reward['true_pos'] + offtrack_reward['false_neg'])
+    else_p = float(else_reward['true_pos']) / float(else_reward['true_pos'] + else_reward['false_neg'])
+
+    default_f1 = 2 * default_p * default_r / (default_p + default_r)
+    offtrack_f1 = 2 * offtrack_p * offtrack_r / (offtrack_p + offtrack_r)
+    else_f1 = 2 * else_p * else_r / (else_p + else_r)
+
+
     print('====> Test set loss: {:.4f}'.format(test_loss))
     print('====> Epoch: {} Average macro: {} Average micro: {}  Average weighted: {}'.format(
         epoch, total_prfs_dict['macro'], total_prfs_dict['micro'], total_prfs_dict['weighted']))
-    
+
     print(total_prfs_dict['none'])
-    
+
     print("prediction counts: {}".format(y_pred_counts))
     print("actual counts: {}".format(y_true_counts))
-    
+
     test_loss_list.append(test_loss / len(test_loader.dataset))
     test_total_prfs_dict_list.append(total_prfs_dict)
     test_y_pred_counts_list.append(y_pred_counts)
     test_y_true_counts_list.append(y_true_counts)
-    
+
     return test_loss
 
 # check vae dir exists, if not, create it
@@ -327,5 +327,5 @@ for epoch in range(1, args.epochs + 1):
         print("End of Training because of early stopping at epoch {}".format(epoch))
         pickle.dump((train_loss_list, test_loss_list, train_total_prfs_dict_list, test_total_prfs_dict_list, train_y_pred_counts_list, test_y_pred_counts_list, train_y_true_counts_list, test_y_true_counts_list), open('vae_reward_eval_scores.p', 'wb'))
         break
-        
+
 pickle.dump((train_loss_list, test_loss_list, train_total_prfs_dict_list, test_total_prfs_dict_list, train_y_pred_counts_list, test_y_pred_counts_list, train_y_true_counts_list, test_y_true_counts_list), open('vae_reward_eval_scores.p', 'wb'))
