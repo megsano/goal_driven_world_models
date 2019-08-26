@@ -75,7 +75,7 @@ class VAERNN_NOGMM(_VAERNN_NOGMMBase):
 
         return recon_vae_obs, ls, rs, ds, recon_batch, gt_obs_mu, gt_obs_logsigma, mus, sigmas
 
-  class VAERNN_NOGMMCell(_VAERNN_NOGMMBase):
+class VAERNN_NOGMMCell(_VAERNN_NOGMMBase):
     """ VAERNN NO GMM Cell model for one step forward """
     def __init__(self,latents, actions, hiddens, gaussians):
         super().__init__(latents, actions, hiddens, gaussians)
