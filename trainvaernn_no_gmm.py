@@ -117,17 +117,16 @@ def get_loss(gt_obs, action, reward, terminal,
                                        gt_next_obs]]
 
     recon_vae_obs, latents, rs, ds, recon_batch, gt_obs_mu, gt_obs_logsigma, mus, sigmas = vaernn_nogmm(action, gt_obs)
-    #Reconstruction loss comparing predicted next observation to actual next observation
+    # Reconstruction loss comparing predicted next observation to actual next observation
     obs_l = obs_loss(gt_next_obs, recon_vae_obs)
 
     gt_obs = gt_obs.transpose(1,0)
     gt_obs = f.upsample(gt_obs.view(-1, 3, SIZE, SIZE), size=RED_SIZE, mode='bilinear', align_corners=True)
 
-#     #Reconstruction loss for initial VAE encodings
+    # Reconstruction loss for initial VAE encodings
     R = f.mse_loss(recon_batch, gt_obs, size_average=False)
 
-#     #KLD loss for initial VAE encodings
-    #KLD loss for latent states
+    # KLD loss for latent states
     KLD_latent = -0.5 * torch.sum(1 + 2 * sigmas - mus.pow(2) - (2 * sigmas).exp())
     KLD = -0.5 * torch.sum(1 + 2 * gt_obs_logsigma - gt_obs_mu.pow(2) - (2 * gt_obs_logsigma).exp())
 
