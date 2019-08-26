@@ -218,7 +218,7 @@ class RolloutGeneratorVAERNN(object):
         """ Build vaernn, controller and environment. """
         # Loading world model and vae
         vaernn_file, ctrl_file = \
-            [join(mdir, m, 'best.tar') for m in ['vaernn', 'ctrl_vaernn_frozen']] # vaernn with gmm 
+            [join(mdir, m, 'best.tar') for m in ['vaernn', 'ctrl_vaernn_frozen']] # vaernn with gmm
 
         assert exists(vaernn_file),\
             "Either vaernn is untrained."
@@ -226,34 +226,31 @@ class RolloutGeneratorVAERNN(object):
         vaernn_state = torch.load(vaernn_file, map_location={'cuda:0': str(device)})
 
         print("Loading VAERNN at epoch {} with test loss {}".format(vaernn_state['epoch'], vaernn_state['precision']))
-        
-        # Convert state dict so that we can load just VAE weights 
+
+        # Convert state dict so that we can load just VAE weights
         new = OrderedDict()
         for key, value in vaernn_state['state_dict'].items():
             if key.startswith('vae'):
                 prev = key
                 new[prev[4:]] = value
         vaernn_state['state_dict'].update(new)
-        
+
         self.vae = VAE(3, LSIZE).to(device)
         self.vae.load_state_dict(vaernn_state['state_dict'], strict=False)
-        
+
         vaernn_state = torch.load(vaernn_file, map_location={'cuda:0': str(device)})
-        
-        # Convert state dict so that we can load just RNN weights 
+
+        # Convert state dict so that we can load just RNN weights
         new = OrderedDict()
         for key, value in vaernn_state['state_dict'].items():
             if key.startswith('rnn'):
                 prev = key
                 new[prev[4:]] = value
         vaernn_state['state_dict'].update(new)
-        
+
         self.rnn = torch.nn.LSTMCell(LSIZE + ASIZE, RSIZE).to(device)
         self.rnn.load_state_dict(
             {k.strip('_l0'): v for k, v in vaernn_state['state_dict'].items()}, strict=False)
-
-#         self.vaernn = VAERNN_NOGMM(LSIZE, ASIZE, RSIZE, 5).to(device)
-#         self.vaernn.load_state_dict(vaernn_state['state_dict'])
 
         self.controller = Controller(LSIZE, RSIZE, ASIZE).to(device)
 
@@ -283,15 +280,15 @@ class RolloutGeneratorVAERNN(object):
             - action: 1D np array
             - next_hidden (1 x 256) torch tensor
         """
-        
+
         _, latent_mu, _ = self.vae(obs)
-       
-        
-        action = self.controller(latent_mu, hidden) 
-        
-        
+
+
+        action = self.controller(latent_mu, hidden)
+
+
         _, next_hidden = self.rnn(torch.cat([action, latent_mu], dim=-1)) #self.mdrnn(action, latent_mu, hidden) how do we know hidden?
-        
+
         return action.squeeze().cpu().numpy(), next_hidden
 
     def rollout(self, params, render=False):
@@ -314,9 +311,6 @@ class RolloutGeneratorVAERNN(object):
         self.env.render()
 
         hidden = torch.zeros(1, RSIZE).to(self.device)
-#         hidden = [
-#             torch.zeros(1, RSIZE).to(self.device)
-#             for _ in range(1)]
 
         cumulative = 0
         i = 0
@@ -333,16 +327,8 @@ class RolloutGeneratorVAERNN(object):
                 print("returned rgen")
                 return - cumulative
             i += 1
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
+
+
 class DreamRolloutGeneratorVAERNN(object):
     """ Utility to generate rollouts.
 
@@ -361,7 +347,7 @@ class DreamRolloutGeneratorVAERNN(object):
         """ Build vaernn, controller and environment. """
         # Loading world model and vae
         vaernn_file, ctrl_file = \
-            [join(mdir, m, 'best.tar') for m in ['vaernn', 'ctrl_vaernn_frozen_dream']] 
+            [join(mdir, m, 'best.tar') for m in ['vaernn', 'ctrl_vaernn_frozen_dream']]
 
         assert exists(vaernn_file),\
             "Either vaernn is untrained."
@@ -369,34 +355,31 @@ class DreamRolloutGeneratorVAERNN(object):
         vaernn_state = torch.load(vaernn_file, map_location={'cuda:0': str(device)})
 
         print("Loading VAERNN at epoch {} with test loss {}".format(vaernn_state['epoch'], vaernn_state['precision']))
-        
-        # Convert state dict so that we can load just VAE weights 
+
+        # Convert state dict so that we can load just VAE weights
         new = OrderedDict()
         for key, value in vaernn_state['state_dict'].items():
             if key.startswith('vae'):
                 prev = key
                 new[prev[4:]] = value
         vaernn_state['state_dict'].update(new)
-        
+
         self.vae = VAE(3, LSIZE).to(device)
         self.vae.load_state_dict(vaernn_state['state_dict'], strict=False)
-        
+
         vaernn_state = torch.load(vaernn_file, map_location={'cuda:0': str(device)})
-        
-        # Convert state dict so that we can load just RNN weights 
+
+        # Convert state dict so that we can load just RNN weights
         new = OrderedDict()
         for key, value in vaernn_state['state_dict'].items():
             if key.startswith('rnn'):
                 prev = key
                 new[prev[4:]] = value
         vaernn_state['state_dict'].update(new)
-        
+
         self.rnn = torch.nn.LSTMCell(LSIZE + ASIZE, RSIZE).to(device)
         self.rnn.load_state_dict(
             {k.strip('_l0'): v for k, v in vaernn_state['state_dict'].items()}, strict=False)
-
-#         self.vaernn = VAERNN_NOGMM(LSIZE, ASIZE, RSIZE, 5).to(device)
-#         self.vaernn.load_state_dict(vaernn_state['state_dict'])
 
         self.controller = Controller(LSIZE, RSIZE, ASIZE).to(device)
 
@@ -426,16 +409,14 @@ class DreamRolloutGeneratorVAERNN(object):
             - action: 1D np array
             - next_hidden (1 x 256) torch tensor
         """
-        
-#         _, latent_mu, _ = self.vae(obs)
-       
-        
-        action = self.controller(latent_mu, hidden) 
-        
-        
+
+
+        action = self.controller(latent_mu, hidden)
+
+
         _, next_hidden = self.rnn(torch.cat([action, latent_mu], dim=-1)) #self.mdrnn(action, latent_mu, hidden) how do we know hidden?
-       
-        
+
+
         return action.squeeze().cpu().numpy(), next_hidden
 
     def rollout(self, params, render=False):
@@ -458,9 +439,6 @@ class DreamRolloutGeneratorVAERNN(object):
         self.env.render()
 
         hidden = torch.zeros(1, RSIZE).to(self.device)
-#         hidden = [
-#             torch.zeros(1, RSIZE).to(self.device)
-#             for _ in range(1)]
 
         cumulative = 0
         i = 0
